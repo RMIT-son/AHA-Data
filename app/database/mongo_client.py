@@ -118,19 +118,11 @@ async def save_message(convo_id: str, message: Message, response: str) -> None:
 
     files = []
     for file_data in (message.files or []):
-        try:
-            gcs_url = await upload_file_to_gcs(convo_id, file_data)
-            files.append({
-                "name": file_data.name,
-                "type": file_data.type,
-                "file": gcs_url
-            })
-        except Exception as e:
-            # fallback: mark upload failed but keep metadata
-            files.append({
-                "name": file_data.name,
-                "type": file_data.type,
-                "file": file_data.file if isinstance(file_data.file, str) else None
+        gcs_url = upload_file_to_gcs(convo_id, file_data)
+        files.append({
+            "name": file_data.name,
+            "type": file_data.type,
+            "file": gcs_url
             })
 
     msg = {

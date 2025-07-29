@@ -21,6 +21,7 @@ transformers==4.53.1
 google-cloud-storage==3.2.0
 qdrant_client==1.14.3
 pymongo==4.13.2
+motor==3.7.1
 redis==6.2.0
 bcrypt==4.3.0
 
