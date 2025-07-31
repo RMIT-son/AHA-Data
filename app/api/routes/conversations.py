@@ -303,22 +303,34 @@ async def stream_message(conversation_id: str,
         classified_message = await classify_message(processed_file, conversation_id)
         processed_message = jsonable_encoder(classified_message)
         async def event_generator():
-            """
-            Generator function to stream data as Server-Sent Events (SSE).
-            """
+            import json
+            """Stream data and get properly formatted final response"""
             final_response = ""
+            
             async with httpx.AsyncClient(base_url=base_url, timeout=None) as client:
                 async with client.stream("POST", "/api/conversations/stream", json=processed_message, timeout=30.0) as response:
+                    if response.status_code != 200:
+                        yield f"data: ERROR - Backend error: {response.status_code}\n\n"
+                        return
+                        
                     async for line in response.aiter_lines():
-                        if not line or not line.startswith("data: "):
-                            continue
-                        data = line.removeprefix("data: ").strip()
-                        if data == "[DONE]":
-                            break
-                        final_response += data + " "
-                        yield f"data: {data}\n\n"
+                        if line.strip() and line.startswith('data: '):
+                            try:
+                                chunk_data = json.loads(line[6:])
+                                
+                                if chunk_data["type"] == "chunk":
+                                    yield f"data: {chunk_data['data']}\n\n"
+                                elif chunk_data["type"] == "done":
+                                    final_response = chunk_data["full_response"]
+                                    break
+                                elif chunk_data["type"] == "error":
+                                    yield f"data: ERROR - {chunk_data['data']}\n\n"
+                                    return
+                                    
+                            except json.JSONDecodeError:
+                                yield f"data: ERROR - Invalid JSON from backend\n\n"
+                                return
 
-            # Save full response once stream finishes
             await save_message(convo_id=conversation_id, message=message, response=final_response)
             yield "data: [DONE]\n\n"
 
